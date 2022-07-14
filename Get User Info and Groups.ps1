@@ -1,0 +1,1 @@
+﻿Get-ADUser ShipmanC -properties * | select -expand directReports | Get-ADUser -properties samaccountname | Sort-Object | Select samaccountname
