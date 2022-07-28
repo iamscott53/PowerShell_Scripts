@@ -1,0 +1,142 @@
+# Created by Justin Taylor (Co-Worker - Waiting on Github link for credit)
+# Modified by Scott Smith
+
+<#
+    .COMPONENT
+    MoreLinq: https://www.nuget.org/packages/morelinq/
+    Recommended path: C:\Program Files\WindowsPowerShell\Modules\Linq\MoreLinq.dll
+
+#>
+
+#Requires -Assembly .\MoreLinq.dll
+
+
+function Get-IQFileChanges {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({
+                try {
+                    Test-Path $_
+                }
+                catch {
+                    throw "Source filepath not found on system: please enter a valid path."
+                }
+            })]
+        [string]$path
+    )
+
+    Add-Type -Path 'C:\Program Files\WindowsPowerShell\Modules\Linq\MoreLinq.dll'
+
+    $array = [System.Collections.ArrayList]@()
+    $topLevelFolders = Get-ChildItem -Path $path -Directory -Force | Where-Object { $_.name -ne '$RECYCLE.BIN' }
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+    foreach ($folder in $topLevelFolders) {
+        Write-Host "Scanning $($folder.fullname)" -f Yellow
+        $files = (Get-Item $folder.fullname).EnumerateFiles("*", 'AllDirectories').Where({ $_.LastWriteTime -ge [datetime]::Today })
+        Write-Host "Done.`n" -f Green
+
+        $obj = [PSCustomObject]@{
+            Folder = $folder.name
+            Files  = $files
+        }
+
+        $null = $array.Add($obj)
+    }
+
+    Write-Host "$($array.files.Count) elements collected in $($stopwatch.Elapsed.TotalSeconds) seconds"
+}
+
+
+
+function Invoke-ParallelFileCopy {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({
+                try {
+                    Test-Path $_
+                }
+                catch {
+                    throw "Source filepath not found on system: please enter a valid path."
+                }
+            })]
+        [string]$source,
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({
+                try {
+                    Test-Path $_
+                }
+                catch {
+                    throw "Destination filepath not found on system: please enter a valid path."
+                }
+            })]
+        [string]$destination
+    )
+
+    #Define file path replacement
+    $path = $source.split("\")
+    $sourceParentFolderName = $path[$path.length - 1]
+    $sourceDrive = $path[0]
+    $path = $destination.split("\")
+    $destinationParentFolderName = $path[$path.length - 1]
+    $destinationDrive = $path[0]
+    
+
+    #Define batch size
+    $batch = 2000
+
+    $ParallelTransfer = @'
+    using System;
+    using System.IO;
+    using System.Threading.Tasks;
+
+    public static class FileTransfer {
+        public static void ParallelTransfer(string[] files, string destinationDirectory, string sourceFolder, string destinationFolder, string sourceDrive, string destinationDrive) {
+            if (files != null && Directory.Exists(destinationDirectory)) {
+                ParallelOptions options = new ParallelOptions {MaxDegreeOfParallelism = -1};
+                Parallel.ForEach(files, options, file => {
+                    string newFilePath;
+                    newFilePath = Path.GetDirectoryName(file).Replace(sourceFolder, destinationFolder).Replace(sourceDrive, destinationDrive);
+                    Console.WriteLine("'{0}'", newFilePath);
+                    System.IO.Directory.CreateDirectory(newFilePath);
+                    File.Copy(file, Path.Combine(newFilePath, Path.GetFileName(file)), overwrite: true);
+                });
+            }
+        }
+    }
+'@
+    Add-Type -TypeDefinition $ParallelTransfer -Language CSharp
+    Add-Type -Path 'C:\Program Files\WindowsPowerShell\Modules\Linq\MoreLinq.dll'
+
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+    #Enumerate files 
+    try {
+        $files = [System.IO.Directory]::EnumerateFiles($source, '*.*', [System.IO.SearchOption]::AllDirectories)
+    } 
+    catch {
+        Write-Host "File enumeration error: $($PSItem.Exception.Message)" -f Magenta
+    }
+
+    try {
+    #Initiate parallel file transfer in batches
+        foreach ($batch in [MoreLinq.Extensions.BatchExtension]::Batch($files, $batch)) {
+            [FileTransfer]::ParallelTransfer($batch, $destination, $sourceParentFolderName, $destinationParentFolderName, $sourceDrive, $destinationDrive)
+        }
+
+            #Cast FileSystemEnumerableIterator to array to enable count method
+        [array]$count = $files
+
+        Write-Host "`nFile transfer complete." -f Green
+        Write-Host "`nElapsed time: $($stopwatch.Elapsed.TotalSeconds) seconds." -f Cyan
+        Write-Host "`nTotal files transferred: $($count.Count)" -f Cyan
+
+    } 
+    catch {
+        Write-Host "File transfer error: $($PSItem.Exception.Message)" -f Magenta
+        Write-Host "`nElapsed time: $($stopwatch.Elapsed.TotalSeconds) seconds." -f Cyan
+        Write-Host "`nTotal files transferred: $($count.Count)" -f Cyan
+    }
+}
