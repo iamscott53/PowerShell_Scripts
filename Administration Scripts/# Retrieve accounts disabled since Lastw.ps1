@@ -8,7 +8,7 @@ $dusers = Get-ADUser -filter {enabled -eq $false -and whenChanged -gt $grabDate}
 $dusersinfo = Get-ADUser -filter {enabled -eq $false -and whenChanged -gt $grabDate} -properties * | where { ($_.memberof | measure).count -gt 1} | select samaccountname,description -Unique
 # Put disabled users in TXT file
 $dusers | Out-File C:\tmp\ad\duserswithgroups.txt
-$dusersinfo | Out-File C:\tmp\ad\duserswithgroupsinfo.txt
+$dusersinfo | Out-File C:\tmp\ad\duserswithgroupsinfo-$grabDate.txt
 
 # Grab disabled users TXT File to remove groups
 $users = Get-Content C:\tmp\ad\duserswithgroups.txt

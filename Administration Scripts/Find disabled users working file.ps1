@@ -51,7 +51,7 @@ foreach ($emails in $content)
 
 
 #### Check to ensure users are not enabled in AD ########
-$users = Get-ADUser -Filter * -Properties enabled
+$users = Get-ADUser -Filter * -Properties enabled | select -ExpandProperty samaccountname
 
 foreach ($user in $users) {
 Get-ADUser -Filter {name -like $user -or samaccountname -like $user} -properties Enabled
