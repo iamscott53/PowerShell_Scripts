@@ -37,7 +37,7 @@ Export-Excel -Path C:\tmp\projects\ad\systemsfull\FSUsersResults.csv -AutoSize -
 
 $content = Get-Content C:\tmp\projects\wizard\wizardemails.txt
 
-foreach ($emails in $content)
+foreach ($emails in $users)
 
 {
 
