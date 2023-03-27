@@ -1,0 +1,67 @@
+#Import-Module ExchangeOnlineManagement
+
+#Get Credentials to connect
+#$cred = Get-Credential
+#Connect-ExchangeOnline -Credential $Credential -ShowBanner:$False
+
+# Find disabled users > 3 days
+$grabDate = ((Get-Date).AddDays(-3)).Date
+$dusers = Get-ADUser -filter { enabled -eq $false -and whenChanged -gt $grabDate } -properties * | Where-Object { ($_.memberof | Measure-Object).count -gt 1 }
+
+# Cloud groups
+#
+#foreach ($email in $dusers) {
+#    $uemails = Get-ADUser -Identity $email -Properties * | select -ExpandProperty EmailAddress -Unique
+#}
+#$uemails | Out-File C:\tmp\ad\DisabledUsersEmails.txt -Append
+#
+#$demails = Get-Content C:\tmp\ad\DisabledUsersEmails.txt
+#
+#foreach ($email in $demails) {
+#    $Office365GroupsMember = Get-UnifiedGroup | where { (Get-UnifiedGroupLinks $_.Alias -LinkType Members | foreach {$_.name}) -contains $mailbox.Alias}
+#}
+#$Office365GroupsMember | Out-File C:\tmp\ad\o365disabledusergroups.txt -Append
+
+
+
+# Arrays for Out-File
+$failures = @()
+$UserTable = @()
+
+$dusers | Out-File C:\tmp\ad\duserswithgroups.txt
+
+# Loop through all users
+foreach ($user in $dusers) {
+    # Array for groups
+    $groups = @()
+    (get-aduser -Identity $user -properties memberof | select memberof).memberof | ForEach-Object {
+        # Fix group names
+        $groups += $_ -replace "(CN=)(.*?),.*", '$2'
+        try {
+            Remove-ADGroupMember -Identity $_ -Members $user -Verbose -confirm:$false
+            Write-Host "Success: removed $($_) from $($user))" -f Green
+            
+            $userobj = [PSCustomObject]@{
+                Name = $user.name
+                Samaccountname = $user.samaccountname
+                Description = $user.description
+            }
+            $UserTable += $userobj
+        }
+        catch {
+            Write-Host "Failure: unable to remove $($_) from $($user))" -f Red
+
+            $fail = [PSCustomObject]@{
+                Name = $user.samaccountname
+                Group = $_ -replace "(CN=)(.*?),.*", '$2'
+            }
+            $failures += $fail
+        }
+        finally {
+            $Error.Clear()
+        }
+    }
+    $groups | Out-File C:\tmp\ad\"$($user.samaccountname)-offboarding.txt"
+    $failures | Export-Excel C:\tmp\ad\DisabledGroupFailures.csv -AutoSize -AutoFilter
+    $UserTable | Export-Excel C:\tmp\ad\DisabledUsersList.csv -AutoSize -AutoFilter
+}

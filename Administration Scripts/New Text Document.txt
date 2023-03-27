@@ -1,0 +1,1 @@
+Get-ADGroup -filter {description -like "*GROUP*"} -properties * | select name,description

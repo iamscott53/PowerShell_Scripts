@@ -1,0 +1,1804 @@
+****SEARCH GROUP DESCRIPTIONS****
+
+Get-AdGroup -filter {GroupCategory -eq "Distribution"} -Properties Description,Canonicalname |Where-Object {$_.Description -like "*DL-*"} |select-object Name,Description,Canonicalname 
+
+
+
+****DISPLAY MEMBERS OF GROUP & CAN EXPORT TO CSV****
+
+AdGroupMember -identity "SSAS_Sales Data Stewards" | select name | export-csv -path "C:\Users\smiths\OneDrive - Segra\Documents\MapcomNOC.csv"
+
+
+
+****SEARCH FOR GROUP WITH SPECIFIED STRING IN NAME OR DESCRIPTION (* * ARE WILDCARDS)****
+
+Get-AdGroup -Filter "name -like '*new user*'" -Properties Description,Canonicalname | select-object Name,Description,Canonicalname
+
+
+
+****DISPLAY GROUPS USER IS MEMBER OF****
+
+(Get-AdUser -Identity OwensN -Properties MemberOf | select-object MemberOf).MemberOf
+
+
+
+****BETTER GROUPS FOR USER MEMBER OF****
+((Get-ADUser galarzaa -Properties memberof).memberof | Get-ADGroup) | Select Name,GroupCategory,GroupScope| Sort-Object Name | Format-Table -AutoSize -Wrap((Get-ADUser galarzaa -Properties memberof).memberof | Get-ADGroup) | Select Name,GroupCategory,GroupScope| Sort-Object Name | Format-Table -AutoSize -Wrap
+
+
+
+****SET ACCOUNT EXPIRATION DATE (Date needs to be +1 day, ex AD sets 12/11/2020 as 12/10/2020)****
+
+Set-ADAccountExpiration -Identity TAYLORJ -DateTime "12/11/2020"
+
+
+
+****DISPLAY GROUP BY EMAIL ADDRESS****
+
+Get-ADObject -LDAPFilter:"(anr=ESRIEOCRequest@LumosNet.com)" -Properties:displayName,Canonicalname,description,managedBy
+
+Get-ADObject -LDAPFilter:"(&(sAMAccountType=805306368)(employeeID=$($id)))" -Properties:displayName,Canonicalname,description,managedBy
+(&(sAMAccountType=805306368)(employeeID=foo))
+
+
+****DISPLAY GROUPS USER IS A MANAGER OF****
+
+Get-ADGroup -LDAPFilter "(ManagedBy=$((Get-ADuser -Identity wellsc).distinguishedname))"-Properties:displayName | select-object name,displayname
+
+
+
+****SET MANAGER OF SPECIFIED GROUP****
+
+Set-ADGroup "Collections" -ManagedBy (Get-ADuser simmonsd)
+
+
+
+****DISPLAY ALL EXPIRED ACCOUNTS****
+
+Search-ADAccount -AccountExpired -UsersOnly | Get-ADUser -Properties AccountExpirationDate, Description | Select-Object Name, SamAccountName, AccountExpirationDate, Description
+
+
+
+****DISPLAY ENABLED STATUS****
+
+Get-ADUser -Identity sxradmin -Properties Enabled | Select-object Enabled
+
+
+
+****DISPLAY ALL GROUPS USER IS MEMBER OF + GROUP MANAGER + REGEX****
+
+(Get-ADuser -Identity TAYLORJ -Properties memberof).memberof | Get-ADGroup -Properties ManagedBy | Select name, @{n='ManagedBy';e={$_.ManagedBy -replace 'CN=|,OU.+|\\',''}} | Sort-Object name
+
+
+
+****BULK ADD USERS TO GROUP**** (need CSV file with User-Name column header)
+
+Import-Csv -Path "C:\Users\taylorj\Desktop\username.csv" | ForEach-Object {Add-ADGroupMember -Identity "PBIRS_Dynamics_Viewers" -Members $_.'User-Name'}
+
+
+
+****DISPLAY MEMBERS OF A GROUP****
+
+AdGroupMember -identity "VPN-Corporate" | select name, @{n='distinguishedName';e={$_.distinguishedName -replace '^.+?(?<!\\),',''}} | export-csv -path C:\Users\taylorj\Desktop\vpn-output-queue.csv
+
+
+
+****MORE ADVANCED MEMBERS OF A GROUP DISPLAY -- Search entire OU****
+
+Get-ADGroup -Filter * -SearchBase "OU=VPN,OU=Groups,DC=LumosNet,DC=com" |
+      ForEach-Object {
+          $members = Get-ADGroupMember $_
+          foreach ($member in $members) {
+              [pscustomobject]@{
+                  "Group Name"     = $_.Name
+                  "User Name"      = $member.name
+                  "SamAccountName" = $member.SamAccountName
+                  "OU"             = $_.distinguishedName -replace '^.+?(?<!\\),',''
+              }
+          }
+      } |
+      Export-Csv "C:\Users\taylorj\Desktop\vpn-output-queue.csv"
+
+
+
+****ADVANCED GROUP DISPLAY MEMBERS -- Search by value****
+
+Get-ADGroup -Filter "name -like '*DL-V*'" |
+      ForEach-Object {
+          $members = Get-ADGroupMember $_
+          foreach ($member in $members) {
+              [pscustomobject]@{
+                  "Group Name"     = $_.Name
+                  "User Name"      = $member.name
+                  "SamAccountName" = $member.SamAccountName
+                  "OU"             = $_.distinguishedName -replace '^.+?(?<!\\),',''
+              }
+          }
+      } |
+      Export-Csv "C:\Users\taylorj\Desktop\vpn-output-queue.csv"
+
+
+****GET USERS BY COMPANY OR MANAGER: for manager replace Company with: Manager -eq "CN=Baldwin\, Joe,OU=Employees,DC=LumosNet,DC=com" ****
+
+Get-ADUser -Filter { Manager -eq "CN=Montz\, Tim,OU=Employees,DC=LumosNet,DC=com" } -Properties name,manager,company | select name,@{n='Manager';e={$_.Manager -replace 'CN=|,OU.+|\\',''}},company | export-csv C:\tmp\MontzUsers.csv
+
+emailaddress
+
+
+
+****ADD EMPID -- Import optional****
+
+Import-CSV "C:\Scripts\Users.csv" | % { 
+$User = $_.UserName 
+Set-ADAccountExpiration -Identity $User -DateTime "12/25/2020"
+} 
+
+
+
+****MASS SET EXPIRATION DATE****
+
+Import-CSV "C:\Users\ExtendOneSupport.csv" | % {
+ $User = $_.UserName
+ Set-ADAccountExpiration -Identity $User -DateTime "01/23/2021"}
+
+
+
+****CHECK THE EXPIRATION DATES WERE SUCCESSFULLY SET****
+Import-CSV "C:\Users\ExtendOneSupport.csv" | % {
+  $User = $_.UserName
+  Get-ADUser -Identity $User -Properties AccountExpirationDate | Select sAMAccountName, AccountExpirationDate}
+
+Import-CSV "C:\Users\contractor extensions.csv" | % {
+   $User = $_.UserName
+   Get-ADUser -Identity $User -Properties AccountExpirationDate | Select sAMAccountName, distinguishedName, AccountExpirationDate}
+
+
+
+
+****SET MULTIPLE USER PROPERTIES - MANAGER, COMPANY, DESCRIPTION****
+Set-ADUser -Identity baileyb -Manager "Stephanie.Houghtalin" -Company "OneSupport" -Description "Contractor for Joe Baldwin"
+
+
+
+****MASS SET MULTIPLE USER PROPERTIES****
+Import-CSV ".\changes.csv" | % {
+ $User = $_.UserName
+ Set-ADUser -Identity $User -Manager "simmonsd" -Company "OneSupport" -Description "Contractor for Stephanie Houghtaling"}
+
+
+
+****CHECK THE PROPERTY WAS SUCCESSFULLY SET****
+Import-CSV "C:\Users\contractor extensions.csv" | % {
+   $User = $_.UserName
+   Get-ADUser -Identity $User -Properties Manager,Company,Description | Select sAMAccountName,@{n='Manager';e={$_.Manager -replace 'CN=|,OU.+|\\',''}},Company,Description}
+
+
+
+****BULK MOVE USERS FROM TXT FILE TO ANOTHER OU****
+$users = Get-Content C:\Users\netcracker.txt
+   ForEach ( $user in $users ) {
+   Get-ADUser -Identity $user | Move-ADObject -TargetPath "OU=Mailbox Staging,OU=Contingent Staff,OU=Vendor Accounts,DC=LumosNet,DC=com"
+   }
+
+
+
+****COUNT USERS****
+(Get-ADUser -Filter {SAMAccountName -like "*.*"}).SAMAccountName.Count
+
+
+
+****SEARCH FOR USERS WHO HAVENT LOGGED ON IN 90 DAYS IN SPECIFIC OU****
+$timespan = New-Timespan -Days 90 
+Search-ADAccount -UsersOnly -AccountInactive -TimeSpan $timespan -SearchBase "OU=Employees,DC=LumosNet,DC=com" | Get-ADuser -Properties Department,Title | Select Name,Department,Title,DistinguishedName
+
+
+
+****DISABLE USERS WHO HAVENT LOGGED ON IN 90 DAYS IN SPECIFIC OU****
+$timespan = New-Timespan -Days 90 
+Search-ADAccount -UsersOnly -AccountInactive -TimeSpan $timespan -SearchBase "OU=Employees,DC=LumosNet,DC=com" | Get-ADuser -Properties Department,Title | Select Name,Department,Title,DistinguishedName | Disable-ADAccount
+
+
+
+
+****SEARCH FOR USER BY EMAIL****
+Get-aduser -Filter { emailaddress -Like "*C*" } -Properties name,emailaddress,company | select name,emailaddress,company
+
+
+$key = Get-Content C:\Users\taylorj\Desktop\keywords.txt
+Foreach ($k in $key) {Get-aduser -Filter { emailaddress -Like *$k*} -Properties name,emailaddress,company | select name,emailaddress,company}
+
+
+
+
+****SEARCH FOR EMAIL BY ! FILTER****
+
+Get-ADUser -Filter * -Properties DisplayName,emailaddress,sAMAccountName,Company,LastLogonDate,whenCreated,Enabled |
+  ? {
+  $_.emailaddress -notlike "*lumos*" `
+ -and $_.emailaddress -notlike "*segra*" `
+ -and $_.emailaddress -notlike "*spirit*" } |
+ Select Name,SamAccountName,emailaddress,Company,LastLogonDate,whenCreated,Enabled |
+ Export-Csv "C:\Users\taylorj\Desktop\nocompanyemail.csv"
+
+
+
+
+****BULK RETRIEVE INFORMATION FROM CSV AND OUTPUT TO TXT FILE****
+
+Import-CSV "C:\Users\separations.csv" | % {
+  $User = $_.UserName
+  Get-ADUser -Identity $User -Properties MemberOf,Description,Enabled | Format-Table -autosize Name,MemberOf,Description,Enabled} | Out-File -FilePath .\Results.txt
+
+
+****BULK REMOVE ALL GROUPS FROM A CSV OF USERS****
+
+Import-CSV "C:\Users\separations.csv" | % {
+ $User = $_.UserName
+ $Users = Get-ADUser -Identity $User -Properties MemberOf
+ ForEach($UserVal in $Users){
+     $UserVal.MemberOf | Remove-ADGroupMember -Member $UserVal -Confirm:$false
+ }}
+
+
+
+****BULK DISABLE ACCOUNT + SET SEPARATION DESCRIPTION FROM CSV OF USERS****
+
+Import-CSV "C:\Users\separations.csv" | % {
+   $User = $_.UserName
+   Set-ADUser -Identity $User -Description "Separation on 9/30/20" -Enabled $false} 
+
+
+
+****DISABLE AND SET SEPARATION DESCRIPTION SINGLE USER****
+
+
+****REMOVE SINGLE USER FROM ALL GROUPS****
+
+$Users = Get-ADUser -Identity Chris.Roy -Properties MemberOf
+ ForEach($User in $Users){
+ $User.MemberOf | Remove-ADGroupMember -Member $User -Confirm:$false
+
+
+
+ ****REMOVE SINGLE USER FROM SPECIFIED GROUPS****
+ Get-Content "C:\Users\groups.txt" | %{ Remove-ADGroupMember -Identity $_ -Members "branchj" -Confirm:$true }
+
+
+
+****GET GROUP DESCRIPTIONS FROM TXT FILE****
+
+$key = Get-Content C:\Users\taylorj\Desktop\shares.txt
+Foreach ($k in $key) {Get-ADGroup -Filter {name -like "$k"} -properties description,groupcategory | select name,description,groupcategory}
+
+
+
+****GET GROUP MEMBERS IN SPECIFIC OU****
+(Get-ADGroupMember  "Duo - External MFA" |
+    ForEach-Object {
+        Get-ADUser -Filter "SamAccountName -eq '$($_.SamAccountName)'" -SearchBase 'OU=External Contractors,OU=Vendor Accounts,DC=LumosNet,DC=com'}
+
+
+
+****DISPLAY GROUPS USER IS MEMBER OF BY TYPE****
+
+get-aduser  GoyalN -Properties memberof | Select-Object -ExpandProperty memberof | Get-ADGroup -Properties groupcategory | Where-Object groupcategory -ne Security | ft name,groupcategory,description
+
+
+****GET SINGLE EXPIRATION DATE****
+
+Get-ADUser -Identity CampbellJ -Properties AccountExpirationDate | Select sAMAccountName, AccountExpirationDate
+
+
+
+****SET SINGLE EXPIRATION DATE****
+
+Set-ADAccountExpiration -Identity CampbellJ -DateTime "01/22/2021"
+
+
+
+****GET MULTIPLE USER GROUP MEMBERSHIPS BY TYPE****
+
+$key = Get-Content C:\Users\clouds.txt
+Foreach ($k in $key) {
+    Write-Output "User $k Permissions" 
+    get-aduser  $k -Properties memberof | Select-Object -ExpandProperty memberof | Get-ADGroup -Properties groupcategory | Where-Object groupcategory -ne Distribution | ft name,groupcategory,description
+}
+
+
+
+****REMOVE LIST OF USERS FROM LIST OF GROUPS****
+
+$users = Get-Content C:\tmp\users.txt
+$groups = Get-Content C:\tmp\groups.txt 
+
+Foreach ($group in $groups) {
+Foreach ($user  in $users)  {
+    Try{
+        Remove-ADPrincipalGroupMembership $user -member $group  -confirm:$false -ErrorAction Stop
+        Write-Host "removing $($user) from $group" -ForegroundColor green
+        Write-Output "User $($user) removed from $group " 
+    }
+    
+    Catch
+        {write-warning "$_ Error removing user $($User) from $group"}
+        }
+    }
+
+
+**** Bulk add users to multiple groups *******
+
+$users = Get-Content C:\tmp\users.txt
+$groups = Get-Content C:\tmp\groups.txt 
+
+Foreach ($user in $users) {
+Foreach ($group  in $groups)  {
+    Try{
+		Add-ADGroupMember -Identity $group -Members $user -confirm:$false -ErrorAction Stop
+        Write-Host "adding $($user) to $group" -ForegroundColor green
+        Write-Output "User $($user) added to $group " 
+    }
+    
+    Catch
+        {write-warning "$_ Error adding user $($User) to $group"}
+    }
+}
+
+
+**** Bulk update group type *******
+$groups = Get-Content C:\tmp\groups.txt 
+Foreach ($group  in $groups)  {
+    Try{
+		Set-Group -Identity $group -confirm:$false -ErrorAction Stop
+        Write-Host "Updating $group to Universal" -ForegroundColor green
+        Write-Output "Updated $group to Universal" 
+    }
+    
+    Catch
+        {write-warning "$_ Error changing $group to Universal"}
+        }
+
+
+Set-Group -Universal
+****************Azure Bulk add users to groups (USE FULL UPN)****************************
+#Get Credentials to connect
+$Credential = Get-Credential
+
+$users = Get-Content C:\tmp\users.txt
+$group = Get-Content C:\tmp\groups.txt
+
+Foreach ($user in $users) {
+Foreach ($group  in $groups)  {
+    Try{
+		Add-UnifiedGroupLinks -Identity $_.GroupID -LinkType Members -Links $_.Member
+        Write-host -f Green "Added Member '$($_.Member)' to Office 365 Group '$($_.GroupID)'"
+        Write-Output "User $($user) success" 
+    }
+    
+    Catch
+        {write-warning "$_ Error with $($User) and $group"}
+        }
+    }
+
+
+  
+#Connect to Exchange Online
+Connect-ExchangeOnline -Credential $Credential -ShowBanner:$False
+ 
+#PowerShell to Import Members to office 365 group from CSV
+Import-CSV "C:\Temp\GroupMembers.csv" | ForEach-Object {
+    Add-UnifiedGroupLinks -Identity $_.GroupID -LinkType Members -Links $_.Member
+    Write-host -f Green "Added Member '$($_.Member)' to Office 365 Group '$($_.GroupID)'"
+}
+ 
+#Disconnect Exchange Online
+Disconnect-ExchangeOnline -Confirm:$False
+
+
+
+**********bulk Set EXPIRATION date*********************
+$users = Get-Content C:\tmp\users.txt
+
+Foreach ($user in $users) {
+	Try{
+ $User = $user
+ $Date = $_.Date
+ Set-ADAccountExpiration -Identity $User -DateTime $Date |
+ Write-Output "User $User expiration date set to $date"} -whatif
+ 
+ 
+ 
+****PARAMETER FOR PRINCIPALGROUPMEMBERSHIP NOT WORKING / NOT AUTHENTICATING****
+
+-Server ADDS-R1-DC01.LumosNet.com
+
+
+
+****SET DEFAULT PARAMETER VALUE FOR AD DOMAIN CONTROLLER****
+
+$PSDefaultParameterValues = @{"*-AD*:Server"='ADDS-R1-DC01.LumosNet.com'}
+
+
+
+****GET AD FOREST INFO****
+
+Get-ADForest -Current LoggedOnUser
+
+
+
+****CONVERT EMAIL TO SAMACCOUNTNAME****
+
+$users = Get-Content -Path "C:\Users\taylorj\Desktop\MapcomRemovals.txt" |
+%{ Get-ADUser -Filter {EmailAddress -eq $_} } | Select-Object SamAccountName |
+Out-File "C:\Users\taylorj\Desktop\logfile.txt"
+
+  Select-Object -ExpandProperty sAMAccountName |
+  Out-File 
+
+ Get-ADUser -Filter {EmailAddress -eq "salesautomation@lumosnet.com"} } | Select-Object SamAccountName
+
+
+****REMOVE USER LIST FROM GROUP****
+
+$users = Get-Content C:\Users\taylorj\Desktop\MapcomRemovals.txt
+$group = "Mapcom Group"
+Foreach ($user  in $users)  {
+    Try{
+        Remove-ADPrincipalGroupMembership $user -member $group  -confirm:$false -ErrorAction Stop
+        Write-Host "removing $($user) from $group" -ForegroundColor green
+        Write-Output "User $($user) removed from $group" | Out-File "C:\Users\taylorj\Desktop\logfile.txt" -Append
+    }
+    Catch
+        {write-warning "$_ Error removing user $($User) from $group"}
+        }
+    }
+
+
+
+****VERBOSE SELECT-OBJECT****
+
+Select-Object -exp <name>
+
+
+
+****GET CONTACT OBJECT NAMES FROM LIST OF EMAILS****
+
+$users = Get-Content C:\Users\taylorj\Desktop\MapcomRemovals.txt
+foreach ($user in users) {
+Get-ADObject -Filter {(objectClass -eq "contact") -and (mail -eq $user)} | select name }
+
+
+
+****BULK CHECK USER NAMES****
+
+$users = Get-Content C:\Users\taylorj\Desktop\users-formatted.txt
+foreach ($user in $users) {
+Get-ADUser -Filter {name -like $user} -properties sAMAccountName | select samaccountname}
+
+
+
+****BETTER BULK CHECK - USER DISPLAY NAMES AGAINST TXT FILE****
+
+get-content C:\Users\taylorj\Desktop\users-formatted.txt | 
+Foreach {
+        if (Get-ADUser -filter "Displayname -like '*$_*'" -ErrorAction SilentlyContinue) {Write-host "$_"}        
+        else {Write-host "Domain\$_ does not exist in AD"}
+    }
+
+
+
+****CONVERT DISPLAY NAMES TO SAMACCOUNTNAMES****
+
+get-content C:\tmp\users.txt |
+Foreach {
+    if (Get-ADUser -filter "Displayname -like '*$_*'" -ErrorAction SilentlyContinue)
+        {Get-AdUser -filter "Displayname -like '*$_*'" -Properties samaccountname | select -exp samaccountname}
+    else {Write-host "User\$_ does not exist in AD"}
+     }
+
+
+
+****GET LIST OF GROUP MEMBERS****
+
+Get-ADGroupMember "Finance_Accounting" | select -expand samaccountname | Get-ADUser $_ -properties company | select name
+
+Get-ADGroupMember -Identity "Netcracker_User" | select name
+
+
+
+****ADD USERS TO GROUP****
+
+Import-Csv -Path "C:\Users\taylorj\Desktop\uatusers.csv" | 
+ForEach-Object {Add-ADGroupMember -Identity "Netcracker_UAT_Users" -Members $_.'UserName'}
+
+
+
+
+****GET DIRECT REPORTS BY DISPLAY NAME****
+
+Get-ADUser WellsC -Properties * | Select-Object -ExpandProperty DirectReports | ForEach-Object { Get-ADUser -Identity $_ | Select-Object Name }
+
+
+
+****GET EMAIL OF GROUP USERS****
+
+Get-ADGroup 'Lumos Plaza Floor 1' -Properties * | Select-Object -ExpandProperty Members | ForEach-Object {Get-ADUser -Identity $_ -Properties name | Select-Object Name}
+
+
+
+****TEMPLATE - EXPAND PROPERTY****
+
+Get-ADUser WellsC -Properties * | select-object -expandproperty directreports | ForEach-Object {Get-ADUser -Identity $_ -Properties * | select-object name,mail,samaccountname
+
+
+
+****ADVANCED BULK EXTEND EXPIRATIONS****
+
+****MASS SET EXPIRATION DATE****
+
+Import-CSV "C:\Users\taylorj\Desktop\extend2.csv" | % {
+ $User = $_.UserName
+ $Date = $_.Date
+ Set-ADAccountExpiration -Identity $User -DateTime $Date |
+ Write-Output "User $User expiration date set to $date"} -whatif
+
+
+
+ ****ADD SINGLE USER TO GROUP****
+
+Groups = Get-Content .\groups.txt
+ForEach ($Group in $Groups) {
+
+    Add-ADPrincipalGroupMembership ManriqueM  -MemberOf  $Group
+    Write-Output "Added to $group"
+
+
+
+****EASY TEMPLATE / USERS / GET-CONTENT****
+
+$users = Get-Content .\reports.txt
+ foreach ($user in $users) { Get-ADUser -Filter {displayname -like $user} -properties * | select name,samaccountname
+
+
+
+
+****GET SAMACCOUNTNAMES FROM USER EMAIL*
+Import-CSV -path ".\cfo.csv" | % {
+ $UserEmail = $_.email
+ Get-ADUser -Filter { emailaddress -Like $UserEmail } -Properties * | select-object -exp samaccountname} | out-file -filepath .\output.txt   
+
+
+
+
+ ****ADD TXT FILE OF SAMACCOUNTNAMES TO GROUP****
+
+ Get-content .\output.txt | % {
+ Add-ADPrincipalGroupMembership $_ -MemberOf Segra360EmployeeYellow
+ Write-Output "Added to $_" }
+
+
+
+
+ ****GET SAMACCOUNTNAMES FROM USER EMAIL TXT FILE VERSION****
+
+get-content ".\users.txt" |
+Foreach {  Get-ADUser -Filter { emailaddress -Like $_ } -Properties * | select-object -exp samaccountname} | out-file -filepath .\output.txt   
+
+
+
+
+
+****ADD USERS TO MULTIPLE GROUPS****
+
+$Users = Get-Content .\userstoadd.txt
+$Groups = Get-Content .\groupstoadd.txt 
+
+Foreach ($User in $Users) {
+  ForEach ($Group in $Groups) {
+    Write-host "Adding $User to $Group`n" -ForegroundColor Green
+    try {
+      Add-ADPrincipalGroupMembership $User -MemberOf $Group
+      Write-Output "Group addition successful.`n" -ForegroundColor Green
+    } catch {
+      Write-Host "User $User NOT added to $Group`n" -ForegroundColor Red
+    }
+  }
+}
+    
+
+
+
+
+****SEARCH DISABLED USERS + EXPORT TO HTML****
+
+Get-ADUser -SearchBase "OU=Employees,DC=LumosNet,DC=com" -Filter {Enabled -eq $false} -properties * | Select-Object Name, SamAccountName, Description, logonCount, @{N='LastLogon'; E={[DateTime]::FromFileTime($_.LastLogon)}},whenCreated,whenChanged | Out-HtmlView
+
+
+
+
+****FORMAT FOR LIST OF USERS TO SEE ACCOUNT ACTIVITY****
+
+$users = Get-Content .\out.txt
+$diff = foreach ($user in $users) { Get-ADUser $user -Server 'scnet.com' -Properties * | select name,enabled, lastLogonDate, @{N = "pwdlastset"; E = {[DateTime]::FromFileTime($_.pwdlastset)}},
+@{N = "AccountExpires"; E = {[DateTime]::FromFileTime($_.AccountExpires)}},
+@{N = "lastLogonTimeStamp"; E = {[DateTime]::FromFileTime($_.lastLogonTimeStamp)}},
+@{N = "lastLogon"; E = {[DateTime]::FromFileTime($_.lastLogon)}
+}} 
+$diff | Out-HtmlView     
+
+
+
+
+
+****QUERY ALL DOMAIN CONTROLLERS FOR LOGIN ATTRIBUTES****
+
+$(foreach ($DC in ((get-addomaincontroller -filter * | sort name).name) ){ $user = get-aduser JoinerJ -properties lastlogon -server     $dc | select name,lastlogon ; echo "$DC - $(w32tm /ntte $user.lastlogon)" }  )
+
+
+
+
+****FILTER AD USERS INACTIVE IN LAST 90 DAYS -- DYNAMIC****
+
+get-aduser -filter * -properties * | Where-Object {$_.lastlogondate -ge (get-date).adddays(-90)}
+
+
+
+
+****FILTER AD USERS INACTIVE SINCE STATIC DATE****
+
+get-aduser -filter * -properties * | Where-Object {$_.lastlogondate -ge "1/7/2014"}
+
+
+
+****CONVERT GREENWICH MEAN TIME (GMT) TO WINDOWS NT TIME (W32TM)
+
+w32tm /ntte 130336170486218095
+
+
+
+
+****SEARCH-ADACCOUNT FILTER****
+
+$users = Search-ADAccount -AccountInactive -DateTime ((get-date).adddays(-90)) -UsersOnly -server 'scnet.com' |
+  ? {
+  $_.name -notlike "*Administrator*" `
+ -and $_.name -notlike "*HealthMailbox*" `
+ -and $_.name -notlike "*SystemMailbox*" `
+ -and $_.name -notlike "*IUSR_*" `
+ -and $_.name -notlike "*IWAM_*" `
+ -and $_.name -notlike "*SVC*" `
+ -and $_.name -notlike "*PBX*" `
+ -and $_.enabled -eq "True" } | Get-ADUser -properties name,samaccountname,description,enabled,lockedOut,lastLogonDate,AccountExpires,lastLogonTimeStamp,lastLogon,pwdlastset,DistinguishedName,passwordNeverExpires,passwordNotRequired,passwordExpired,whenCreated,whenChanged,accountLockoutTime | select name,samaccountname,description,enabled,lockedOut,lastLogonDate,
+@{N = "AccountExpires"; E = {[DateTime]::FromFileTime($_.AccountExpires)}},
+@{N = "lastLogonTimeStamp"; E = {[DateTime]::FromFileTime($_.lastLogonTimeStamp)}},
+@{N = "lastLogon"; E = {[DateTime]::FromFileTime($_.lastLogon)}},DistinguishedName,
+@{Name='OU';Expression={$_.DistinguishedName.Split(',')[1].replace('OU=','')}},passwordNeverExpires,passwordNotRequired,passwordExpired,@{N = "pwdlastset"; E = {[DateTime]::FromFileTime($_.pwdlastset)}},whenCreated,whenChanged,accountLockoutTime | export-csv .\scnet_script_output_121220.csv
+
+
+
+
+
+ ****FILTER GET USER****
+
+ $filter = {(Name -notlike "Administrator*")-and (Name -notlike "HealthMailbox*") -and (Name -notlike "SystemMailbox*") -and (Name -notlike "*IUSR_*") -and
+(Name -notlike "IWAM_*") -and (Name -notlike "SVC*") -and (Name -notlike "PBX*")}
+Get-Aduser -Filter $filter -server 'scnet.com' -Properties name,lastLogonDate | Select name,lastLogonDate | out-file .\out4.txt
+
+
+
+
+
+****SEARCH-ADACCOUNT FILTER /W PRETTY EXCEL TABLE****
+
+$users = Search-ADAccount -AccountInactive -DateTime ((get-date).adddays(-90)) -UsersOnly -server 'scnet.com' |
+  ? {
+  $_.name -notlike "*Administrator*" `
+ -and $_.name -notlike "*HealthMailbox*" `
+ -and $_.name -notlike "*SystemMailbox*" `
+ -and $_.name -notlike "*IUSR_*" `
+ -and $_.name -notlike "*IWAM_*" `
+ -and $_.name -notlike "*SVC*" `
+ -and $_.name -notlike "*PBX*" `
+ -and $_.enabled -eq "True" } | Get-ADUser -properties name,samaccountname,description,enabled,lockedOut,lastLogonDate,AccountExpires,lastLogonTimeStamp,lastLogon,pwdlastset,DistinguishedName,passwordNeverExpires,passwordNotRequired,passwordExpired,whenCreated,whenChanged,accountLockoutTime | select name,samaccountname,description,enabled,lockedOut,lastLogonDate,
+@{N = "AccountExpires"; E = {[DateTime]::FromFileTime($_.AccountExpires)}},
+@{N = "lastLogonTimeStamp"; E = {[DateTime]::FromFileTime($_.lastLogonTimeStamp)}},
+@{N = "lastLogon"; E = {[DateTime]::FromFileTime($_.lastLogon)}},DistinguishedName,
+@{Name='OU';Expression={$_.DistinguishedName.Split(',')[1].replace('OU=','')}},passwordNeverExpires,passwordNotRequired,passwordExpired,@{N = "pwdlastset"; E = {[DateTime]::FromFileTime($_.pwdlastset)}},whenCreated,whenChanged,accountLockoutTime 
+
+$xlfile = "$env:TEMP\PSreports.xlsx"
+Remove-Item $xlfile -ErrorAction SilentlyContinue
+
+$users | Select -First 50 |
+    Export-Excel $xlfile -AutoSize -StartRow 2 -TableName ReportProcess
+
+Get-Service | Select -First 5 |
+    Export-Excel $xlfile -AutoSize -StartRow 11 -TableName ReportService
+
+$excel = Get-ChildItem $env:HOMEPATH\Documents\WindowsPowerShell |
+    Select PSDRive, PSIsC*, FullName, *time* |
+    Export-Excel $xlfile -AutoSize -StartRow 20 -TableName ReportFiles -PassThru
+
+$ws = $excel.Workbook.Worksheets['Sheet1']
+
+$xlParams = @{WorkSheet=$ws;Bold=$true;FontSize=18;AutoSize=$true}
+
+Set-Format -Range A1  -Value "Report Process" @xlParams
+Set-Format -Range A10 -Value "Report Service" @xlParams
+Set-Format -Range A19 -Value "Report Files"   @xlParams
+
+Close-ExcelPackage $excel -Show
+
+
+
+
+
+****SEARCH INACTIVE ACCOUNTS****
+
+$users = Search-ADAccount -AccountInactive -DateTime ((get-date).adddays(-90)) -server 'scnet.com' -UsersOnly | 
+? {
+  $_.name -notlike "*test*" `
+ -and $_.name -notlike "*admin*" `
+ -and $_.name -notlike "*HealthMailbox*" `
+ -and $_.name -notlike "*SystemMailbox*" `
+ -and $_.name -notlike "*IUSR_*" `
+ -and $_.name -notlike "*$*" `
+ -and $_.name -notlike "*SM_*" `
+ -and $_.name -notlike "*IWAM_*" `
+ -and $_.enabled -eq "True" } | Get-ADUser -properties name,samaccountname,description,enabled,lockedOut,lastLogonDate,AccountExpires,lastLogonTimeStamp,lastLogon,pwdlastset,DistinguishedName,passwordNeverExpires,passwordNotRequired,passwordExpired,whenCreated,whenChanged,accountLockoutTime | select name,samaccountname,description,enabled,lockedOut,lastLogonDate,
+@{N = "AccountExpires"; E = {[DateTime]::FromFileTime($_.AccountExpires)}},
+@{N = "lastLogonTimeStamp"; E = {[DateTime]::FromFileTime($_.lastLogonTimeStamp)}},
+@{N = "lastLogon"; E = {[DateTime]::FromFileTime($_.lastLogon)}},DistinguishedName,
+@{Name='OU';Expression={$_.DistinguishedName.Split(',')[2].replace('OU=','')}},passwordNeverExpires,passwordNotRequired,passwordExpired,@{N = "pwdlastset"; E = {[DateTime]::FromFileTime($_.pwdlastset)}},whenCreated,whenChanged,accountLockoutTime 
+
+
+Get-ADUser -Filter * -Properties name,samaccountname,mail,manager,enabled -SearchBase "OU=Employees,DC=LumosNet,DC=com" | 
+? {
+  $_.manager -eq $null `
+ -and $_.name -notlike "*test*" `
+ -and $_.name -notlike "*admin*" `
+ -and $_.name -notlike "*manager*" `
+ -and $_.name -notlike "*template*" `
+ -and $_.name -notlike "*restore*" `
+ -and $_.name -notlike "*$*" `
+ -and $_.description -notlike "*test*" `
+ -and $_.description -notlike "*admin*" `
+ -and $_.description -notlike "*delete*" `
+ -and $_.enabled -eq "True" } 
+
+
+****GET-ACL FOLDER + EXPORT ERRORS****
+
+Get-ChildItem C:\Temp -Recurse -ErrorAction SilentlyContinue -ErrorVariable gci_errors | ForEach-Object {
+    $_ | Get-Acl -ErrorAction SilentlyContinue -ErrorVariable gacl_errors }
+$gci_errors | Select-Object -ExpandProperty CategoryInfo | Export-Csv -NoTypeInformation -Path C:\Temp\gci_errors.csv 
+$gacl_errors | Select-Object -ExpandProperty CategoryInfo | Export-Csv -NoTypeInformation -Path C:\Temp\gacl_errors.csv
+
+
+
+
+****GET GROUPS WITH ZERO MEMBERS****
+
+Get-ADGroup -Filter { member -notlike '*'} -SearchBase "OU=Fileshares,OU=Groups,DC=LumosNet,DC=com" -Properties SamAccountName, Description,member | Select-Object SamAccountName,Description,member.Count | export-csv .\Fileshares_Zero_Members.csv
+
+
+
+
+
+****GET AD GROUP MEMBER REPORT PSCUSTOMOBJECT****
+
+Get-ADGroup -Filter "name -like '*DL-V*'" |
+      ForEach-Object {
+          $count = (Get-ADGroupMember $_).Count
+          $members = Get-ADGroupMember $_
+          foreach ($member in $members) {
+              [pscustomobject]@{
+                  "Group Name"     = $_.Name
+                  "User Name"      = $member.name
+                  "SamAccountName" = $member.SamAccountName
+                  "OU"             = $_.distinguishedName -replace '^.+?(?<!\\),',''
+                  "Count"          = $count
+              }
+          }
+      } |
+      Export-Csv "C:\Users\taylorj\Desktop\vpn-output-queue.csv"
+
+
+
+****GET COUNT OF GROUP MEMBERS****
+
+Get-ADGroup -Filter { name -like "DL-*"} -Properties SamAccountName, Description,member |
+ForEach-Object {
+          $count = (Get-ADGroupMember $_).Count
+          $members = Get-ADGroupMember $_
+          % {
+              [pscustomobject]@{
+                  "Group Name"     = $_.Name
+                  "OU"             = $_.distinguishedName -replace '^.+?(?<!\\),',''
+                  "Count"          = $count
+              }
+          }
+      }
+
+
+****COMPARE GROUP MEMBERSHIP FUNCTION _ WARNING LONG SCRIPT****
+
+Function Get-ADGroupsDifference {
+
+    Param (
+        [parameter(Mandatory = $false)]
+        [alias("BaseUser")]
+        [String]$ReferenceUser,
+        [parameter(Mandatory = $false)]
+        [alias("CurrentUser")]
+        [String]$User,
+        [parameter(Mandatory = $false)]
+        [String]$DomainName,
+        [parameter(Mandatory = $false)]
+        [Switch]$IncludeEqual
+    )
+    BEGIN {
+        if ($null -eq (Get-Module -name 'ActiveDirectory' -ErrorAction SilentlyContinue)) {
+            Import-Module -Name 'ActiveDirectory' -ErrorAction Stop | Out-Null
+        }
+        if ($DomainName -eq $Null) {
+            $DomainName = (Get-ADdomain -Current LoggedOnUser).DNSRoot
+        }
+        [String]$DomainController = (Get-ADDomainController -DomainName $DomainName -Discover).HostName
+        $Results = @()
+        # Define custom default view
+        $defaultDisplaySet = 'ReferenceUser', 'User', 'GroupName', 'SideIndicator', 'SideIndicatorName'
+        # Create the default property display set
+        $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet(‘DefaultDisplayPropertySet’, [string[]]$defaultDisplaySet)
+        $PSStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
+    }
+    PROCESS {
+        $Error.Clear()
+        Try {
+            $ReferenceUser = Read-Host -Prompt("Enter SamAccountName for User One")
+            $User = Read-Host -Prompt("Enter SamAccountName for User Two")
+            $ReferenceUserObject = Get-ADUser -Identity $ReferenceUser -Properties MemberOf, PrimaryGroup -server $DomainController
+            $ReferenceUserGroups = $ReferenceUserObject | Select-Object -Property MemberOf -ExpandProperty MemberOf
+            $CurrentUserObject = Get-ADUser -Identity $User -Properties MemberOf, PrimaryGroup -server $DomainController
+            $CurrentUserGroups = $CurrentUserObject | Select-Object -Property MemberOf -ExpandProperty MemberOf
+        }
+        Catch {
+            Write-Error -Message $error[0]
+        }
+        if ($Error.count -eq 0) {
+            if ($null -eq $ReferenceUserGroups) {
+                $ReferenceUserGroups = @()
+            }
+            elseif ($null -eq $CurrentUserGroups) {
+                $CurrentUserGroups = @()
+            }
+            $Differences = @(Compare-Object -ReferenceObject $ReferenceUserGroups -DifferenceObject $CurrentUserGroups -IncludeEqual:$($IncludeEqual.IsPresent))
+            ForEach ($Difference in $Differences) {
+                $Result = New-Object PSObject
+                $Result | Add-Member -type 'NoteProperty' -name ReferenceUser -value $ReferenceUser
+                $Result | Add-Member -type 'NoteProperty' -name User -value $User
+                $Result | Add-Member -type 'NoteProperty' -name GroupName -value ($Difference.InputObject -replace '^CN=|,.*$')
+                $Result | Add-Member -type 'NoteProperty' -name GroupDistinguishedName -value $Difference.InputObject
+                $Result | Add-Member -type 'NoteProperty' -Name GroupCanonicalName -Value $(ConvertFrom-DN ($Difference.InputObject))
+                if (($Difference.SideIndicator).ToLower().Contains("<=".ToLower())) {
+                    $Result | Add-Member -Type 'NoteProperty' -name SideIndicator -Value -1
+                    $Result | Add-Member -Type 'NoteProperty' -Name SideIndicatorName -Value "Only $ReferenceUser"
+                }
+                elseif (($Difference.SideIndicator).ToLower().Contains("=>".ToLower())) {
+                    $Result | Add-Member -Type 'NoteProperty' -Name SideIndicator -Value 1
+                    $Result | Add-Member -Type 'NoteProperty' -Name SideIndicatorName -Value "Only $User"
+                }else{
+                    $Result | Add-Member -Type 'NoteProperty' -Name SideIndicator -Value 0
+                    $Result | Add-Member -Type 'NoteProperty' -Name SideIndicatorName -Value "Both users"
+                    }
+                $Result.PSObject.TypeNames.Insert(0, 'ADUser.GroupDifferenceObject')
+                $Result | Add-Member MemberSet PSStandardMembers $PSStandardMembers
+                $Results += $Result
+            }}}
+    END {
+        Return $Results}}
+function ConvertFrom-DN {
+    param ([string]$DN = (Throw '$DN is required!'))
+    foreach ($item in ($DN.replace('\,', '~').split(","))) {
+        switch -regex ($item.TrimStart().Substring(0, 3)) {
+
+            "CN=" { $CN += , $item.replace("CN=", ""); $CN += '/'; continue }
+
+            "OU=" { $OU += , $item.replace("OU=", ""); $OU += '/'; continue }
+
+            "DC=" { $DC += $item.replace("DC=", ""); $DC += '.'; continue }
+        } }
+    $canonical = $dc.Substring(0, $dc.length - 1)
+    if ($ou.count -gt 0) {
+        for ($i = $ou.count; $i -ge 0; $i--) { $canonical += $ou[$i] }
+    }
+    if ($CN.count -gt 0) {
+        for ($i = $CN.count; $i -ge 0; $i--) { $canonical += $CN[$i] }}
+    return $canonical}
+
+Get-AdGroupsDifference
+
+
+
+
+
+****COMPARE SAMACCOUNT TO PRINCIPAL**
+
+Get-ADUser -Filter * | Where-Object {($_.samaccountname + "@LumosNet.com") -ne ($_.userprincipalname)} | format-table -autosize samaccountname,userprincipalname
+
+$User = Get-ADUser -Filter * | Where-Object {($_.samaccountname + "@LumosNet.com") -ne ($_.userprincipalname)} | format-table -autosize samaccountname,userprincipalname "String"
+
+
+
+**FIND USERS NO MANAGER ASSIGNED**
+
+
+
+ Get-ADUser -SearchBase "OU=Employees,DC=LumosNet,DC=com" -Filter * -Properties name,manager,description,samaccountname,title,department,company,directreports,enabled,lockedOut,lastLogonDate,AccountExpires,lastLogonTimeStamp,lastLogon,pwdlastset,DistinguishedName,passwordNeverExpires,passwordNotRequired,passwordExpired,whenCreated,whenChanged,accountLockoutTime | 
+? {
+  $_.manager -eq $null `
+ -and $_.name -notlike "*test*" `
+ -and $_.name -notlike "*admin*" `
+ -and $_.name -notlike "*manager*" `
+ -and $_.name -notlike "*template*" `
+ -and $_.name -notlike "*restore*" `
+ -and $_.name -notlike "*$*" `
+ -and $_.description -notlike "*test*" `
+ -and $_.description -notlike "*admin*" `
+ -and $_.description -notlike "*delete*" `
+ -and $_.enabled -eq "True" } | select name,description,samaccountname,title,department,company,@{n='directReports';e={$_.directreports -replace 'CN=|,OU.+|\\','' -join '; '}},enabled,lockedOut,lastLogonDate,
+@{N = "lastLogonTimeStamp"; E = {[DateTime]::FromFileTime($_.lastLogonTimeStamp)}},
+@{N = "lastLogon"; E = {[DateTime]::FromFileTime($_.lastLogon)}},DistinguishedName,
+@{Name='OU';Expression={$_.DistinguishedName.Split(',')[2].replace('OU=','')}},
+@{N = "AccountExpires"; E = {[DateTime]::FromFileTime($_.AccountExpires)}},
+pwdlastset,passwordNeverExpires,passwordNotRequired,passwordExpired,whenCreated,whenChanged,accountLockoutTime | export-csv .\here.csv
+
+
+
+
+**FIND ALL NS USERS**
+
+ Get-ADUser -Filter * -Properties name,manager,description,samaccountname,title,department,company,directreports,enabled,lockedOut,lastLogonDate,AccountExpires,lastLogonTimeStamp,lastLogon,pwdlastset,DistinguishedName,passwordNeverExpires,passwordNotRequired,passwordExpired,whenCreated,whenChanged,accountLockoutTime | 
+? {
+  $_.company -like "*north*" `
+ -and $_.name -notlike "*test*" `
+ -and $_.name -notlike "*admin*" `
+ -and $_.name -notlike "*manager*" `
+ -and $_.name -notlike "*template*" `
+ -and $_.name -notlike "*restore*" `
+ -and $_.name -notlike "*$*" `
+ -and $_.description -notlike "*test*" `
+ -and $_.description -notlike "*admin*" `
+ -and $_.description -notlike "*delete*" `
+ -and $_.enabled -eq "True" } | select name,description,samaccountname,@{n='Manager';e={$_.Manager -replace 'CN=|,OU.+|\\',''}},title,department,company,@{n='directReports';e={$_.directreports -replace 'CN=|,OU.+|\\','' -join '; '}},enabled,lockedOut,lastLogonDate,
+@{N = "lastLogonTimeStamp"; E = {[DateTime]::FromFileTime($_.lastLogonTimeStamp)}},
+@{N = "lastLogon"; E = {[DateTime]::FromFileTime($_.lastLogon)}},DistinguishedName,
+@{Name='OU';Expression={$_.DistinguishedName.Split(',')[2].replace('OU=','')}},
+@{N = "AccountExpires"; E = {[DateTime]::FromFileTime($_.AccountExpires)}},
+pwdlastset,passwordNeverExpires,passwordNotRequired,passwordExpired,whenCreated,whenChanged,accountLockoutTime | export-csv .\ns2.csv
+
+
+
+
+**COMPARE CSV OBJECTS**
+
+$file1 = import-csv .\checkidle_111720.csv 
+$file2 = import-csv .\scnet_script_output_117220.csv
+(Compare-Object -ReferenceObject $file1 -DifferenceObject $file2 -property "samaccountname" |
+    ForEach-Object {
+        $_.SideIndicator = $_.SideIndicator -replace '=>','Not in Security Script' -replace '<=','Not in My Script'
+        $_
+    })
+
+
+
+
+$file1 = import-csv "C:\Users\taylorj\Desktop\Batches - Not Executed\Batch 2 - NULL Logins.csv"
+$file2 = import-csv "C:\Users\taylorj\Desktop\Batches - Not Executed\scnet_created_by_joe_2.csv" 
+(Compare-Object -ReferenceObject $file1 -DifferenceObject $file2 -property "samaccountname" |
+    ForEach-Object {
+        $_.SideIndicator = $_.SideIndicator -replace '=>','Has NO null login' -replace '<=','Has NULL login'
+        $_
+    })
+
+
+
+
+
+****END OF SCRIPT REPO****
+
+$users = Search-ADAccount -AccountInactive -DateTime ((get-date).adddays(-90)) -server 'scnet.com' -UsersOnly | 
+? {
+  $_.name -notlike "*SA_*" `
+ -and $_.name -notlike "SA *" `
+ -and $_.name -notlike "*admin*" `
+ -and $_.name -notlike "*HealthMailbox*" `
+ -and $_.name -notlike "*SystemMailbox*" `
+ -and $_.name -notlike "*IUSR_*" `
+ -and $_.name -notlike "*$*" `
+ -and $_.name -notlike "*_SA" `
+ -and $_.name -notlike "*IWAM_*" `
+ -and $_.name -notlike "*IWAM_*" `
+ -and $_.distinguishedName -notlike "*OU=Service Accounts*" `
+ -and $_.enabled -eq "True" } | Get-ADUser -properties name,samaccountname,description,enabled,lockedOut,lastLogonDate,AccountExpires,lastLogonTimeStamp,lastLogon,pwdlastset,DistinguishedName,passwordNeverExpires,passwordNotRequired,passwordExpired,whenCreated,whenChanged,accountLockoutTime | select name,samaccountname,description,enabled,lockedOut,lastLogonDate,
+@{N = "AccountExpires"; E = {[DateTime]::FromFileTime($_.AccountExpires)}},
+@{N = "lastLogonTimeStamp"; E = {[DateTime]::FromFileTime($_.lastLogonTimeStamp)}},
+@{N = "lastLogon"; E = {[DateTime]::FromFileTime($_.lastLogon)}},DistinguishedName,
+@{Name='OU';Expression={$_.DistinguishedName -replace '.+?,OU=(.+?),(?:OU|DC)=.+','$1'}},passwordNeverExpires,passwordNotRequired,passwordExpired,@{N = "pwdlastset"; E = {[DateTime]::FromFileTime($_.pwdlastset)}},whenCreated,whenChanged
+$users | export-csv .\scnet_script_output_011620_exclude_SA.csv
+
+
+
+
+$users = Search-ADAccount -AccountInactive -DateTime ((get-date).adddays(-90)) -UsersOnly | 
+? {
+  $_.name -notlike "*svc*" `
+ -and $_.name -notlike "SA *" `
+ -and $_.name -notlike "*admin*" `
+ -and $_.name -notlike "*HealthMailbox*" `
+ -and $_.name -notlike "*SystemMailbox*" `
+ -and $_.name -notlike "*IUSR_*" `
+ -and $_.name -notlike "*$*" `
+ -and $_.name -notlike "*_SA" `
+ -and $_.name -notlike "*IWAM_*" `
+ -and $_.name -notlike "*IWAM_*" `
+ -and $_.distinguishedName -notlike "*OU=ServiceAccounts*" `
+  -and $_.distinguishedName -notlike "*OU=GenericAccounts*" `
+ -and $_.enabled -eq "True" } | Get-ADUser -properties name,samaccountname,description,enabled,lockedOut,lastLogonDate,AccountExpires,lastLogonTimeStamp,lastLogon,pwdlastset,DistinguishedName,passwordNeverExpires,passwordNotRequired,passwordExpired,whenCreated,whenChanged,accountLockoutTime,manager,company,title | select name,samaccountname,description,enabled,lockedOut,lastLogonDate,
+@{N = "AccountExpires"; E = {[DateTime]::FromFileTime($_.AccountExpires)}},
+@{N = "lastLogonTimeStamp"; E = {[DateTime]::FromFileTime($_.lastLogonTimeStamp)}},
+@{N = "lastLogon"; E = {[DateTime]::FromFileTime($_.lastLogon)}},DistinguishedName,
+@{Name='OU';Expression={$_.DistinguishedName -replace '.+?,OU=(.+?),(?:OU|DC)=.+','$1'}},passwordNeverExpires,passwordNotRequired,passwordExpired,@{N = "pwdlastset"; E = {[DateTime]::FromFileTime($_.pwdlastset)}},whenCreated,whenChanged,@{n='Manager';e={$_.Manager -replace 'CN=|,OU.+|\\',''}},company,title 
+$users | export-csv .\lumosnet_script_output_010821_exclude_SA.csv
+
+
+
+
+**GET LINES BY DATE FROM CSV**
+$Data = Import-CSV .\scnet_script_output_118220_exclude_SA.csv | Where-Object {$_.Date -as [datetime] -lt $((Get-Date).AddDays(-300))}
+
+
+
+
+**GET LINES BY FIELD FROM CSV & EXPORT**
+Import-Csv .\scnet_script_output_118220_exclude_SA.csv | ? passwordExpired -like "TRUE" | export-csv -path "C:\Users\taylorj\Desktop\Batches - Not Executed\Batch 1 - Password Expired.csv"
+
+
+
+
+
+**SELECT NULL USERS FROM CSV - FILTER OUT NULL USERS WITH PWDCHANGE WITHIN 90 DAYS**
+
+Import-Csv .\scnet_script_output_118220_exclude_SA.csv | ? {
+    $_.lastLogonTimeStamp -like "NULL" `
+    -and $_.passwordExpired -notlike "TRUE" `
+    -and $_.pwdlastset -as [datetime] -lt $((Get-Date).AddDays(-90))  } | export-csv -path "C:\Users\taylorj\Desktop\Batches - Not Executed\Batch 2 - NULL Logins.csv"
+
+
+
+
+
+**IMPORT FIELDS THAT ARE NOT BLANK FROM CSV**
+Import-Csv .\scnet_script_output_118220_exclude_SA.csv | ? {
+    $_.lastLogonDate -as [datetime] -lt $((Get-Date).AddDays(-1460)) `
+    -and $_.lastLogonDate `
+    -and $passwordExpired -notlike "TRUE" `
+    -and $_.lastLogonTimeStamp -notlike "NULL" `
+    } | export-csv -path "C:\Users\taylorj\Desktop\Batches - Not Executed\Batch 3 - Greater Than 4 Years No Login.csv"
+
+
+
+
+
+**COMBINE ALL CSVS IN DIRECTORY**
+Get-ChildItem -Filter *.csv | Select-Object -ExpandProperty FullName | Import-Csv | Export-Csv .\merged\merged.csv -NoTypeInformation -Append
+
+
+
+
+**COMPARE CSVs - CHANGE INDICATOR**
+
+$file1 = import-csv "C:\Users\taylorj\Desktop\scnet_script_output_118220_exclude_SA.csv"
+$file2 = import-csv "C:\Users\taylorj\Desktop\Batches - Not Executed\merged\merged.csv"
+ (Compare-Object -ReferenceObject $file1 -DifferenceObject $file2 -property "samaccountname" |
+     ForEach-Object {
+         $_.SideIndicator = $_.SideIndicator -replace '=>','Not in new file' -replace '<=','Not in merged file'
+         $_
+     }) | Out-File .\merged_comparison.txt
+
+
+
+
+ **PDCEmulator AUTHENTICATING WITH SCNET FOR Get-ADPrincipalGroupMembership**
+
+$PSDefaultParameterValues = @{"*-AD*:Server"='col-vm-dc1.scnet.com'}
+
+
+
+
+**EXTEND ACCOUNT 90 DAYS**
+
+param (
+[Parameter (Mandatory=$True,Position=0)]
+[datetime]$Date,
+[Parameter (Mandatory=$True,Position=1)]
+[string]$Name
+)
+
+$daysToAdd = 90
+$Info = Get-ADUser -Identity $name -properties name,AccountExpirationDate | select name,AccountExpirationDate
+Write-Host "`n------------------------------------------------`n" -ForegroundColor Gray
+Write-Host "Extending Expiration Date for user " -nonewline
+Write-Host "$($Info.name)`n" -ForegroundColor Cyan 
+Write-Host "Current Expiration Date is: " -nonewline
+Write-Host "$($Info.AccountExpirationDate)`n" -ForegroundColor Cyan
+Set-ADAccountExpiration -Identity $name -DateTime $date.AddDays($daysToAdd)
+Sleep 1
+$NewDate = Get-ADUser -Identity $name -properties name,AccountExpirationDate | select name,AccountExpirationDate
+Write-Host "New Expiration Date is: " -nonewline
+Write-Host "$($NewDate.AccountExpirationDate)" -ForegroundColor Green
+Write-Host "`n------------------------------------------------`n" -ForegroundColor Gray
+
+#
+$users = Get-Content C:\tmp\groups.txt 
+
+
+
+foreach ($user in $users) {
+
+
+
+$daysToAdd = 90
+$extTimeframe = (Get-Date).AddDays($daysToAdd)
+
+
+
+try {
+$currentExp = $null
+$currentExp = Get-ADUser $user -properties * -server ADDS-C1-DC02 | select -expand AccountExpirationDate
+$currentExp = $currentExp.ToString("MM/dd/yyyy")
+Write-Host "`nAttempting to set expiration date for $($user)" -f Yellow
+Write-Host "`nCurrent expiration date is: $($currentExp)" -f Cyan
+Set-ADAccountExpiration -Identity $user -DateTime $extTimeframe -server ADDS-C1-DC02 -ErrorAction Stop -whatif
+Write-Host "`nSuccess: expiration date set." -f Green
+$newExp = $null
+$newExp = Get-ADUser $user -properties * -server ADDS-C1-DC02 | select -expand AccountExpirationDate
+$newExp = $newExp.ToString("MM/dd/yyyy")
+Write-Host "`nNew expiration date is: $($newExp)" -f Cyan
+}
+catch {
+Write-Host "`nFailure: $($PSItem.Exception.Message)" -f Red
+}
+finally {
+$Error.Clear()
+}
+}
+	
+	
+
+
+**GET DATE + DAYS 90**
+
+(Get-Date).AddDays(90)
+
+
+
+**CHECK GROUP FOR DISABLED USERS**
+
+Get-ADGroup "NCorp - Spirit Full" -properties * | select -expandproperty members | Get-ADUser -properties * |
+ ? {$_.enabled -like "*f*"} | ft -autosize samaccountname,enabled | out-file .\Spirit_disabled.txt
+
+
+
+
+ **FIND OUTPUT ENUMERATION VARIABLE**
+ $FormatEnumerationLimit
+
+
+
+
+ **HOW TO USE CALCULATED PROPERTY IN SELECT STATEMENT**
+ 
+ @{Name="ManagerEmail";Expression={(get-aduser -property emailaddress $_.manager).emailaddress}} 
+
+
+
+
+ **DISABLE + REMOVE GROUPS + SET DESCRIPTION FROM TXT FILE**
+
+ $Users = Get-Content .\onesup.txt
+foreach ($User in $Users) {
+  Write-Host "User is: $User`n" -ForegroundColor Green
+  try {
+  Set-ADUser -Identity $User -Description "Separation on 12/4/20" -Enabled $false
+  Write-Host "  $User description set.`n" -ForegroundColor Green
+  Write-Host "  $User disabled.`n" -ForegroundColor LightGreen
+  } catch {
+    Write-Host "ERROR in SET USER" -ForegroundColor Red
+  }
+  try {
+    $UserGroups = Get-ADUser -Identity $User -Properties MemberOf
+    $GroupOutput = $UserGroups | select -ExpandProperty MemberOf | Get-ADGroup | select name
+    Write-Host "Grabbing $User groups: $($GroupOutput)" -ForegroundColor Green
+    $UserGroups.MemberOf | Remove-ADGroupMember -Member $User -Confirm:$false
+    Write-Host "`n$User groups removed.`n" -ForegroundColor Green
+  } catch {
+    Write-Host "ERROR in REMOVE GROUPS" -ForegroundColor Red
+  }
+}
+
+
+
+**TOP LEVEL OU EXTRACTION**
+
+
+@{Name='OU';Expression={$_.DistinguishedName -replace '.+?,OU=(.+?),(?:OU|DC)=.+','$1'}}
+
+
+
+**FIND ADMIN PROTECTED ACCOUNTS**
+
+Get-ADObject -LDAPFilter:"(adminCount=1)" -properties * | select name
+
+
+
+
+**GET LIST OF USERS BY GROUP + MANAGER + MANAGER EMAIL (CALC PROPERTY EXAMPLE)**
+
+Get-ADGroupMember "Thycotic Users" | select -expandproperty samaccountname | Get-ADUser -properties name,manager,enabled,lastlogondate | ? {$_.name -notlike "*admin*"} | ft -auto name,enabled,lastlogondate,@{n='Manager';e={$_.Manager -replace 'CN=|,OU.+|\\',''}},@{Name="ManagerEmail";Expression={(get-aduser -property emailaddress $_.manager).emailaddress}} 
+
+
+**SUBTRACT DATE**
+
+{$_.ReceivedTime -gt $((Get-Date).AddDays(-3))}
+
+
+
+
+
+
+
+
+
+
+
+
+**SELECT OBJECT EXPRESSIONS --------------- IMPORTANT ------- FORMAT GROUPS FOR CSV**
+
+@{Label = 'MemberOf'; Expression = {($_.MemberOf | ForEach-Object {([regex]"CN=(.*?),").match($_).Groups[1].Value}) -join "; "}}
+
+@{Label = 'DirectReports'; Expression = {($_.DirectReports | ForEach-Object {([regex]"CN=(.*?),").match($_).Groups[1].Value}) -join ","}} |
+Format-List
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ***********************ADVANCED SCRIPTS THAT DUPLICATE ABOVE*********************
+
+**ADD BULK USERS TO GROUP**
+
+
+[CmdletBinding()] 
+ 
+param (
+[Parameter (Mandatory=$True,Position=0)]
+[string]$CSV,
+[Parameter (Mandatory=$True,Position=1)]
+[string]$GroupName
+)
+
+BEGIN{ 
+    #Checks if the user is in the administrator group. Warns and stops if the user is not. 
+    try { 
+    Import-Module ActiveDirectory 
+    } 
+    catch { 
+    Write-Warning "The Active Directory module was not found" 
+    } 
+    try { 
+    $Users = Import-CSV $CSV
+    } 
+    catch { 
+    Write-Warning "The CSV file was not found" 
+    } 
+} 
+PROCESS{ 
+try {
+$Members = Get-ADGroupMember -Identity $GroupName -Recursive | Select -ExpandProperty SAMAccountName 
+Write-Host "The AD group was found. Beginnging add." -ForegroundColor Green
+}
+catch {
+  Write-Warning "The AD group was not found"
+}
+    Start-Transcript -Path .\testlog.txt
+    foreach($User in $Users){ 
+      $User = $User.sAMAccountName
+        try{ 
+          If ($Members -contains $User)  
+            { 
+                Write-Host "$User is already a member of $GroupName" -ForegroundColor Blue
+            }  
+     
+          Else     
+            { 
+                Write-Host "$User is not a member. Attempting to add now." -ForegroundColor Yellow
+                try {
+                #Add-ADGroupMember -Identity $GroupName -Members $User -ErrorAction Stop -Verbose
+                $Fullname = Get-ADUser $User | select -expandproperty name
+                Write-Host "$($Fullname)"
+                Add-ADGroupMember -Identity $GroupName -Members $User
+                Write-Host "$User successfully added to $GroupName" -ForegroundColor Green
+                }
+                catch {
+                Write-Warning "$User NOT added."
+                }
+
+            } 
+        } 
+        catch{ 
+        } 
+
+   } 
+  Stop-Transcript } 
+
+END{ 
+  
+}
+
+
+
+
+$netcrackerGroups = Get-ADGroup -filter {name -like "*netcracker*"} -properties Name 
+
+foreach ($group in $netcrackerGroups) {
+  Get-ADGroupMember $group | select name,sAMAccountName | export-csv .\"$($group.Name).csv"
+}
+
+
+
+$path="C:\Users\taylorj\Desktop\netcracker" #target folder
+cd $path;
+
+$csvs = Get-ChildItem .\* -Include *.csv
+$y=$csvs.Count
+Write-Host "Detected the following CSV files: ($y)"
+foreach ($csv in $csvs)
+{
+Write-Host " "$csv.Name
+}
+$outputfilename = $(get-date -f yyyyMMdd) + "_" + $env:USERNAME + "_combined-data.xlsx" #creates file name with date/username
+Write-Host Creating: $outputfilename
+$excelapp = new-object -comobject Excel.Application
+$excelapp.sheetsInNewWorkbook = $csvs.Count
+$xlsx = $excelapp.Workbooks.Add()
+$sheet=1
+
+foreach ($csv in $csvs)
+{
+$row=1
+$column=1
+$worksheet = $xlsx.Worksheets.Item($sheet)
+$worksheet.Name = $csv.Name
+$file = (Get-Content $csv)
+foreach($line in $file)
+{
+$linecontents=$line -split ',(?!\s*\w+")'
+foreach($cell in $linecontents)
+{
+$worksheet.Cells.Item($row,$column) = $cell
+$column++
+}
+$column=1
+$row++
+}
+$sheet++
+}
+$output = $path + "\" + $outputfilename
+$xlsx.SaveAs($output)
+$excelapp.quit()
+cd \ #returns to drive root
+
+$users = Get-Content .\list.txt 
+foreach ($user in $users) {
+  Remove-ADGroupMember -Identity VPN-Corporate -Member $user -confirm:$false
+  Write-Host "User $user removed from VPN-Corporate."
+}
+
+
+**PARSE CSV AND FORMAT BULK EMAILS**
+
+$output = @()
+
+Import-CSV '.\NS Bulk ICMS.csv' | % { $name = $_.ADUsername
+$input = Get-ADUser $name -properties * | select name,emailaddress, @{Name="ManagerEmail";Expression={(get-aduser -property emailaddress $_.manager).emailaddress}} 
+
+"`nGood morning,`n`nWe have created ICMS and Yoda accounts for you, with the following credentials:`n`nICMS`nUsername: $($_.ICMSUsername)`nPassword: $($_.Password)`n`nYoda`nUsername: $($input.emailaddress)`nPassword: current network password`n`nIf you have any questions or issues logging in, please let us know.`n`nThanks,`n`n"
+
+$output += "`nGood morning,`n`nWe have created ICMS and Yoda accounts for you, with the following credentials:`n`nICMS`nUsername: $($_.ICMSUsername)`nPassword: $($_.Password)`n`nYoda`nUsername: $($input.emailaddress)`nPassword: current network password`n`nIf you have any questions or issues logging in, please let us know.`n`nThanks,`n`n" }
+
+
+
+**DISABLE ACCOUNTS**
+
+Import-CSV .\contractors.csv | % {$cn = $_.cn
+$user = Get-ADUser -filter {cn -like $cn} -properties * | select -expandproperty samaccountname 
+Set-ADUser -Identity $user -Description "Disabled 2/2/21 per Assurance" -Enabled $false
+$user.MemberOf | Remove-ADGroupMember -Member $user -confirm:$false
+$newprops = Get-ADUser $user -properties * 
+Write-Host "User $user`nDescription:$($newprops.description)`nMemberof: $($newprops.memberof)`nEnabled: $($newprops.enabled)`n" }
+
+
+
+**GET SAMACCOUNTNAME FROM EMAIL**
+
+$names = @()
+
+Get-Content .\ns.txt | % {$email = $_
+
+  $user = Get-ADUser -filter {emailaddress -eq $email} -properties * | select -expandproperty samaccountname
+  if (!$user) {
+    Write-Host "Checking segra address" -foregroundcolor red
+    $email = $email -replace "@lumosnet","@segra"
+    $user = Get-ADUser -filter {emailaddress -eq $email} -properties * | select -expandproperty samaccountname
+  }
+
+Write-Host "checking user email $email"
+Write-Host "user = $user`n`n" -foregroundcolor green
+
+$names += $user
+$user | out-file .\nsnames.txt}
+
+
+
+**GET AD GROUP USER PASSWORD LAST SET DATES**
+
+Get-ADGroup NOC_Fortinet_Mgr -server 'scnet.com' -properties * | select -expandproperty members | Get-ADUser -server 'scnet.com' -properties * | ? {$_.enabled -eq $true} | Sort-Object passwordlastset | select name,passwordlastset,samaccountname | export-csv .\noc_fortinet_mgr_passwords.csv
+
+$results = @()
+
+$groups = Get-ADGroup -filter {name -like "*Forti*"} -properties * -server 'scnet.com' | select SamAccountName
+
+foreach ($group in $groups) {
+  Write-Host "`nGroup is $($group.samaccountname)" -ForegroundColor Cyan
+
+  $members = Get-ADGroup $group.samaccountname -server 'scnet.com' -properties * | select -expandproperty members 
+
+    foreach ($member in $members) {
+      $output = $null
+      $output = Get-ADUser $member -server 'scnet.com' -properties * | select name,passwordlastset,samaccountname 
+
+      if ($output -ne $null) {
+        Write-Host "Success - adding" -ForegroundColor Green
+        $output
+        $results += $output
+      } else {
+        Write-Host "Nested group - checking" -ForegroundColor Red
+        $output = Get-ADgroup $member -server 'scnet.com' -properties * | select -expandproperty members | Get-ADUser -server 'scnet.com' -properties * | select name,passwordlastset,samaccountname
+        $output
+        $results += $output
+        }
+    }
+}
+
+$results | Select-Object * -Unique | export-csv .\forti.csv
+
+
+
+
+****DELETE LIST OF GROUPS****
+
+    get-content .\groupstodelete.txt | % {$group = $_
+      try {
+        Remove-ADGroup -Identity $group -confirm:$false
+        Write-Host "Removed Group: $group`n" -ForegroundColor Cyan
+      } catch {
+        Write-Error
+        Write-Host "Warning - Group NOT removed." -ForegroundColor Red
+      }
+    }
+
+
+
+****CONVERT GROUP NAMES FROM CN TO SAMACCOUNT****
+
+    $groups = @()
+    get-content .\groups.txt | % { $group = $_
+    $group = Get-ADGroup $group -properties * | select *
+    $groups += $group
+    $group
+    }
+
+
+****DISABLE AND MOVE USER - TXT FILE****
+
+    Get-Content .\names.txt | % {
+        Write-Host "Modifying user: $_"
+        Set-ADUser -Identity $_ -Description "Disabled 2/19/21 per Assurance" -Enabled $false
+        Get-ADUser $_ | Move-ADObject -TargetPath 'OU=On Demand Contractors,OU=External Contractors,OU=Vendor Accounts,DC=LumosNet,DC=com'
+    }
+
+
+
+****REMOVE MULTIPLE USERS FROM LIST OF GROUPS****
+
+    $users = Get-ADUser -filter * -searchbase "OU=Care Call,OU=External Contractors,OU=Vendor Accounts,DC=LumosNet,DC=com" -properties * | ? {$_.enabled -eq $true -and ($_.company -like "*OneSup*" -or $_.company -like "*Telen*")}
+
+    $groups = get-content .\groups.txt | % { Get-ADGroup $_ -properties * | select samaccountname}
+
+    foreach ($group in $groups) {
+      Write-Host "`nEditing group $($group.SamAccountName)"
+      foreach ($user in $users) { 
+        Write-Host "Removing $($user.name)" -foregroundcolor cyan
+        try {
+          Remove-ADGroupMember -Identity $group.SamAccountName -Members $user.SamAccountName
+          Write-Host "  Success" -foregroundcolor green
+        } catch {
+          Write-Host "  Failure on $($user.SamAccountName)" -foregroundcolor red
+        }
+      }
+    }
+
+
+
+**GET GROUP LIST**
+
+$users = Get-ADUser -filter * -searchbase "OU=Care Call,OU=External Contractors,OU=Vendor Accounts,DC=LumosNet,DC=com" -properties * | ? {$_.enabled -eq $true -and ($_.company -like "*OneSup*" -or $_.company -like "*Telen*")}
+
+$output = foreach ($user in $users) {
+  "$($user.name):  "
+  Get-ADUser $user.SamAccountName -properties * | select -expandproperty memberof | Get-ADGroup | Sort-Object | select -expandproperty samaccountname
+}
+
+$output | out-file .\groupmembership.txt
+
+
+$UAT = Get-ADGroupMember Netcracker_UAT_Users | select SamAccountName
+$Users = Get-ADGroupMember Netcracker_User | select SamAccountName
+$Admin = Get-ADGroupMember Netcracker_Admin | select SamAccountName
+
+foreach ($user in $UAT) {
+  "User is $user"
+  if ($Users -contains $user.SamAccountName) {
+    Write-Host "DING" -ForegroundColor Green
+  } else {
+    Write-Host "FAILURE" -ForegroundColor Red
+  }
+}
+
+ -or $Admin -contains $user
+
+
+
+
+**GET MEMBER COUNT OF SECURITY GROUPS**
+ Get-ADGroup -Filter {GroupCategory -eq "security"} -properties samaccountname,members,description,managedby,distinguishedname  | % {
+          [pscustomobject]@{
+              "Group Name"     = $_.samAccountName
+              "Member Count"      = ($_.members).Count
+              "OU"             = ($_.distinguishedName -replace '.+?,OU=(.+?),(?:OU|DC)=.+','$1')
+              "Managed By"    = $_.
+              "Description" = ($_.managedBy -replace 'CN=|,OU.+|\\','')
+          }
+      } | 
+      Export-Csv .\output.csv
+
+
+
+
+**GET USERS FROM SPECIFIC OU NOT IN GROUP**
+
+$users = Get-ADUser -filter {enabled -eq $true} -searchbase "OU=Employees,DC=LumosNet,DC=com" -properties name,memberof
+
+$users | ? {"CN=Employees,OU=Groups,DC=LumosNet,DC=com" -notin $_.memberof -and $_.samaccountname -notlike "*admin*" -and $_.samaccountname -notlike "*Test*"} | select samaccountname,@{Label = 'MemberOf'; Expression = {($_.MemberOf | ForEach-Object {([regex]"CN=(.*?),").match($_).Groups[1].Value}) -join ","}} | export-csv .\employees-missing.csv
+
+
+
+
+**GET USER ACL**
+
+(Get-ACL "AD:$((Get-ADUser svc-mbam-sql).distinguishedname)").access | out-file C:\Users\taylorj\Desktop\txt.txt
+
+**GET DEFAULT PASSWORD POLICY**
+
+(Get-ADForest -Current LoggedOnUser).Domains | %{ Get-ADDefaultDomainPasswordPolicy -Identity $_ }
+
+**OR**
+
+Get-ADDefaultDomainPasswordPolicy | select *
+
+
+
+
+
+**QUERY DOMAIN CONTROLLER - SEE PASSWORD EXPIRATION DATE**
+
+Net user GoyalN /domain
+
+
+
+
+**GET PASSWORDS LAST CHANGED GREATER THAN 90 DAYS AGO**
+
+Get-ADUser -Filter 'Enabled -eq $True' -Properties PasswordLastSet -searchbase "OU=Vendor Accounts,DC=LumosNet,DC=com" | Where-Object {$_.PasswordLastSet -lt (Get-Date).adddays(-90)} | select Name,SamAccountName,PasswordLastSet,@{Name='OU';Expression={$_.DistinguishedName -replace '.+?,OU=(.+?),(?:OU|DC)=.+','$1'}} | export-csv .\passwords.csv
+
+
+
+
+**GET LIST OF PASSWORD EXPIRATION DATES**
+
+Get-ADUser -filter {Enabled -eq $True -and PasswordNeverExpires -eq $False} –Properties "DisplayName", "msDS-UserPasswordExpiryTimeComputed",passwordlastset,enabled,distinguishedname,passwordneverexpires -searchbase "OU=Vendor Accounts,DC=LumosNet,DC=com" |
+Select-Object -Property "Displayname",passwordlastset,@{Name="ExpiryDate";Expression={[datetime]::FromFileTime($_."msDS-UserPasswordExpiryTimeComputed")}},@{Name='OU';Expression={$_.DistinguishedName -replace '.+?,OU=(.+?),(?:OU|DC)=.+','$1'}},enabled,passwordneverexpires | export-csv .\passwordexpiry.csv
+
+
+
+
+**SET PASSWORD POLICY 90 DAYS (NO PERMISSIONS FOR THIS, JUST FOR REF)**
+
+New-ADFineGrainedPasswordPolicy -Name "MaxPassword90Days" -DisplayName "Max Password Age 90 Days" -ComplexityEnabled $true -Description "Increases the Maximum Password Age to 90 days." -LockoutDuration 00:15:00 -LockoutObservationWindow 00:15:00 -LockoutThreshold 5 -MaxPasswordAge 90:00:00:00 -MinPasswordAge 1:00:00:00 -MinPasswordLength 7 -PasswordHistoryCount 12 -ReversibleEncryptionEnabled $false -Precedence 100
+
+Add-ADFineGrainedPasswordPolicySubject MaxPassword90Days -Subjects "OU=Vendor Accounts,DC=LumosNet,DC=com"
+
+
+
+**GET ANR FROM FIRSTNAME LASTNAME TXT FILE**
+
+Get-Content .\names.txt | % {Get-ADUser -Filter {anr -eq $_} -properties name,emailaddress | fl name,emailaddress}
+
+
+
+**LIST USERS PASSWORD EXPIRE DATES IN VENDOR OU NOT A MEMBER OF VPN-CORPORATE**
+
+
+$users = Get-ADUser -filter {Enabled -eq $true -and PasswordNeverExpires -eq $False} –Properties "DisplayName", "msDS-UserPasswordExpiryTimeComputed",passwordlastset,manager,enabled,distinguishedname,passwordneverexpires,memberof -searchbase "OU=Vendor Accounts,DC=LumosNet,DC=com" | ? { $_.memberof -notlike "*CN=VPN-Corporate,OU=VPN,OU=Groups,DC=LumosNet,DC=com*" } |
+Select-Object -Property "Displayname",passwordlastset,@{Name="ExpiryDate";Expression={[datetime]::FromFileTime($_."msDS-UserPasswordExpiryTimeComputed")}},@{Name='OU';Expression={$_.DistinguishedName -replace '.+?,OU=(.+?),(?:OU|DC)=.+','$1'}},enabled,passwordneverexpires,@{n='Manager';e={$_.Manager -replace 'CN=|,OU.+|\\',''}},@{Label = 'MemberOf'; Expression = {($_.MemberOf | ForEach-Object {([regex]"CN=(.*?),").match($_).Groups[1].Value}) -join "; "}} 
+
+$users | ? {$_.memberof -notlike "*VPN-Corporate*"} | export-csv .\passwordexpiry.csv
+
+
+
+**GET AZURE AD SECURITY GROUPS**
+
+Get-AzureADUserMembership -ObjectId $user.Value.ExternalDirectoryObjectId -All $true | ? {$_.ObjectType -eq "Group" -and $_.SecurityEnabled -eq $true -and $_.MailEnabled -eq $false}
+
+
+
+**EXO COMMAND - GET ALL DISTRO GROUPS**
+
+Get-EXORecipient -ResultSize unlimited | ? {($_.RecipientType -ne "UserMailbox" -and $_.RecipientType -ne "Mailuser") -and ($_.RecipientTypeDetails -eq "GroupMailbox" -or $_RecipientTypeDetails -eq "MailUniversalSecurityGroup" -or $_.RecipientTypeDetails -eq "MailUniversalDistributionGroup")} | select PrimarySmtpAddress | out-file .\emails3.txt
+
+
+# Get all of the Office 365 groups
+$azgroups = Get-AzureADMSGroup -Filter "groupTypes/any(c:c eq 'Sales Kickoff”')" -All:$true
+Write-Output "$($azgroups.Count) Office 365 groups were found"
+
+# Get info for departing user
+$upn        = Read-Host "UserPrincipalName of user being removed from groups"
+$AZuser     = Get-AzureADUser -SearchString $upn
+
+# Get info for delegate
+$delegate   = Read-Host "UserPrincipalName of user taking over group ownership"
+$AZdelegate = Get-AzureADUser -SearchString $delegate
+
+# Check each group for the user
+foreach ($group in $azgroups) {
+    $members = (Get-AzureADGroupMember -ObjectId $group.id).UserPrincipalName
+    If ($members -contains $upn) {
+      Write-Output "$upn detected in $($group.DisplayName)"
+        $memberof += $group
+	}
+}
+
+Get-AzureADMSGroup -All $true | Select-Object DisplayName, GroupTypes,MailEnabled, SecurityEnabled | export-csv .\azuregroups.csv
+
+Get-AzureADUser -SearchString ColeJ | Get-AzureADUserMembership | Select displayname,description
+
+
+
+
+
+***USE REGEX WITH FILTER WITH WILDCARD**
+
+Get-ADGroup -Filter "SamAccountName -like '*$userInput*'" -Properties * | ft samaccountname
+
+
+
+
+**O365 GET SHARED MAILBOX USERS**
+
+Get-Mailbox RSBRetention-TotalCare@lumosnet.com -Filter {recipienttypedetails -eq "SharedMailbox"} | Get-Mailboxpermission | Select -expand User | Sort-Object
+
+#Get Credentials to O365 tenant
+$credential = Get-Credential
+Connect-AzureAD –Credential $credential
+$disabled_OnlineMembership = foreach ($user in $disabledUsers) {
+    if ($user.UserPrincipalName) {
+        $userObjectId = Get-Msoluser –UserPrincipalName $user.UserPrincipalName | Select-Object –ExpandProperty ObjectId
+        $group = Get-AzureADUserMembership –ObjectId $userObjectId | Select-Object * | Where-Object {-not ($_.DirSyncEnabled)}
+        if ($group) {
+            [pscustomobject]@{
+                UserName = $user.SamAccountName
+                DisplayName = $user.Name
+                Enabled = $user.Enabled
+                UserDN = $user.DistinguishedName
+                AADUserObjecID = $userObjectId
+                GroupName = $group.DisplayName
+                GroupMail = $group.Mail
+                AADGroupID = $group.ObjectID
+            }
+        }
+    }
+}
+
+$input = Read-Host "Enter username"
+
+$user = Get-ADUser $input -properties * 
+
+$userObjectId = Get-Msoluser –UserPrincipalName $user.UserPrincipalName | Select-Object –ExpandProperty ObjectId
+
+$group = Get-AzureADUserMembership –ObjectId $userObjectId | Select-Object * | Where-Object {-not ($_.DirSyncEnabled)}
+
+        if ($group) {
+            [pscustomobject]@{
+                UserName = $user.SamAccountName
+                DisplayName = $user.Name
+                Enabled = $user.Enabled
+                UserDN = $user.DistinguishedName
+                AADUserObjecID = $userObjectId
+                GroupName = $group.DisplayName
+                GroupMail = $group.Mail
+                AADGroupID = $group.ObjectID
+            } | export-csv .\test.csv
+        } 
+
+
+Get-Content .\users.txt | % {
+  Set-ADUser -Identity $_ -Manager "Nate.Nichols" -Description "Contractor for Nate Nichols" -verbose -whatif
+  $x=(Get-Date).ToString("yyyy:MM:dd hh:mm:ss tt")
+  Write-Output "`n$x $($_) attributes updated"
+##error
+}
+
+
+
+
+**FIX ENUMERATION**
+$FormatEnumerationLimit = -1
+
+
+
+
+**GET LIST OF GROUPS + PRINT USERS + WHAT GROUP THEY ARE IN**
+
+
+$users = @()
+Get-ADGroup -filter {name -like "*SSRS*"} -properties * | % {
+  $groupname = "$($_.name)"
+  $groupname
+  $userlist = $_.members | Get-ADUser | select -expand name | % {
+    Write-Host "$($_)"
+    $users += [pscustomobject]@{
+      Name = $_
+      ADGroup = $groupname
+    }
+  }
+}
+
+
+
+######### List of users compare ##############
+$users = ForEach ($user in $(Get-Content C:\Users\cduff\Downloads\test\users.txt)) {
+
+    Get-AdUser $user -Properties Department,Mail
+        
+}
+    
+ $users |
+ Select-Object SamAccountName,Department,Mail |
+ Export-CSV -Path C:\Users\cduff\Downloads\test\output.csv -NoTypeInformation

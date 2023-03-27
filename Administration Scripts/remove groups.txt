@@ -1,0 +1,45 @@
+# remove groups (and log them)
+
+# Find disabled users > 3 days
+$grabDate = ((Get-Date).AddDays(-3)).Date
+$dusers = Get-ADUser -filter { enabled -eq $false -and whenChanged -gt $grabDate } -properties * | Where-Object { ($_.memberof | Measure-Object).count -gt 1 }
+
+# Arrays for Out-File
+$failures = @()
+$UserTable = @()
+
+# Loop through all users
+foreach ($user in $dusers) {
+    # Array for groups
+    $groups = @()
+    $user.memberof | ForEach-Object {
+        # Fix group names
+        $groups += $_ -replace "(CN=)(.*?),.*", '$2'
+        try {
+            Remove-ADGroupMember -Identity $_ -Members $user -Verbose -WhatIf
+            Write-Host "Success: removed $($_) from $($user))" -f Green
+            
+            $userobj = [PSCustomObject]@{
+                Name = $user.name
+                Samaccountname = $user.samaccountname
+                Description = $user.description
+            }
+            $UserTable += $userobj
+        }
+        catch {
+            Write-Host "Failure: unable to remove $($_) from $($user))" -f Red
+
+            $fail = [PSCustomObject]@{
+                Name = $user.samaccountname
+                Group = $_ -replace "(CN=)(.*?),.*", '$2'
+            }
+            $failures += $fail
+        }
+        finally {
+            $Error.Clear()
+        }
+    }
+    $groups | Out-File C:\tmp\ad\"$($user.samaccountname)-offboarding.txt"
+    $failures | Export-Excel C:\tmp\ad\DisabledGroupFailures.csv -AutoSize -AutoFilter
+    $UserTable | Export-Excel C:\tmp\ad\DisabledUsersList.csv -AutoSize -AutoFilter
+}
