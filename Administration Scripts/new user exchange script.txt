@@ -1,1 +1,0 @@
-Enable-remotemailbox -identity USERNAME -remoteroutingaddress "FIRSTNAME.LASTNAME@lumosnetworks.mail.onmicrosoft.com"
